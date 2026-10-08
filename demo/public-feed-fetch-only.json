@@ -1,0 +1,51 @@
+{
+ "generatedAt": "2026-10-08T13:50:59.226Z",
+ "canvasUrl": "https://canvas.auckland.ac.nz",
+ "student": "",
+ "deadlines": [
+  {
+   "id": "2026-10-23NZ-HKB1000regregion@www.officeholidays.com",
+   "title": "New Zealand: Hawke's Bay Anniversary Day (Regional Holiday)",
+   "course": "",
+   "due": "2026-10-22T11:00:00.000Z",
+   "url": "https://www.officeholidays.com/holidays/new-zealand/hawkes-bay/hawkes-bay-anniversary-day",
+   "source": "calendar",
+   "kind": "event",
+   "status": "unknown"
+  },
+  {
+   "id": "2026-10-26NZ605regcountry@www.officeholidays.com",
+   "title": "New Zealand: Labour Day",
+   "course": "",
+   "due": "2026-10-25T11:00:00.000Z",
+   "url": "https://www.officeholidays.com/holidays/new-zealand/new-zealand-labour-day",
+   "source": "calendar",
+   "kind": "event",
+   "status": "unknown"
+  },
+  {
+   "id": "2026-11-02NZ-MBH3187regregion@www.officeholidays.com",
+   "title": "New Zealand: Marlborough Anniversary Day (Regional Holiday)",
+   "course": "",
+   "due": "2026-11-01T11:00:00.000Z",
+   "url": "https://www.officeholidays.com/holidays/new-zealand/marlborough/marlborough-anniversary-day",
+   "source": "calendar",
+   "kind": "event",
+   "status": "unknown"
+  }
+ ],
+ "grades": [],
+ "announcements": [],
+ "inbox": [],
+ "calls": {
+  "fetch": 1,
+  "agent": 0,
+  "monitor": 0
+ },
+ "sources": [
+  "calendar feed"
+ ],
+ "warnings": [],
+ "agentSteps": [],
+ "runId": ""
+}
