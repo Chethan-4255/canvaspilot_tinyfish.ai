@@ -1,6 +1,6 @@
 # CanvasPilot
 
-**Live Demo:** [https://canvaspilot-tinyfish-ai.vercel.app/](https://canvaspilot-tinyfish-ai.vercel.app/) | **Video Demo:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=flat&logo=YouTube&logoColor=white)](https://www.youtube.com/)
+**Live Demo:** [https://canvaspilot-tinyfish-ai.vercel.app/](https://canvaspilot-tinyfish-ai.vercel.app/) | **Video Demo:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=flat&logo=YouTube&logoColor=white)](https://youtu.be/SY2ykzZFlPE)
 
 so CanvasPilot is a TinyFish agent for Canvas LMS, it signs in to my own University of Auckland Canvas account using a browser session i saved, reads what is due, what got graded and what the lecturers announced, and gives me one digest plus a calendar file i can drop into Google Calendar. I built this because every Monday i was opening five courses one by one just to find out what was due this week and whether anything got marked, so this is the thing i set up once and run every week of the semester.
 
@@ -95,7 +95,7 @@ so to run this on your machine you first need to install the dependencies and co
 ## Links
 
 * **Live Demo:** [https://canvaspilot-tinyfish-ai.vercel.app/](https://canvaspilot-tinyfish-ai.vercel.app/)
-* **Video Demo:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=flat&logo=YouTube&logoColor=white)](https://www.youtube.com/)
+* **Video Demo:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=flat&logo=YouTube&logoColor=white)](https://youtu.be/SY2ykzZFlPE)
 * **Developer:** Chethan Vasthaw Tippani
 * **LinkedIn:** [https://www.linkedin.com/in/chethan-vasthaw/](https://www.linkedin.com/in/chethan-vasthaw/)
 * **Portfolio:** [https://chethan-4255.github.io/Portfolio/](https://chethan-4255.github.io/Portfolio/)
