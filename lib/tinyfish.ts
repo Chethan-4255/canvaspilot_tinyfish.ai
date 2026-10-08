@@ -6,27 +6,37 @@ async function request(url:string,key:string,body:unknown,signal?:AbortSignal,ti
  const timeoutSignal=AbortSignal.timeout(timeout);
  const response=await fetch(url,{method:method||(body?"POST":"GET"),headers:{"X-API-Key":key,...(body?{"Content-Type":"application/json"}:{})},body:body?JSON.stringify(body):undefined,signal:signal?AbortSignal.any([signal,timeoutSignal]):timeoutSignal});
  if(!response.ok){const status=response.status;let detail="";try{const j=await response.json() as {error?:{code?:string;message?:string};message?:string};detail=j.error?.message||j.message||j.error?.code||""}catch{}
-  throw new Error(status===401||status===403?(detail.includes("VAULT")?"TinyFish Vault needs reconnecting in the dashboard.":"TinyFish authentication failed. Check the API key."):status===402?"TinyFish credits are unavailable. Top up the wallet and retry.":status===429?"TinyFish rate limit reached. Try again shortly.":`TinyFish returned HTTP ${status}${detail?`: ${detail}`:"."}`)}
+  throw new Error(status===401?(detail.includes("VAULT")?"TinyFish Vault needs reconnecting in the dashboard.":"TinyFish authentication failed. Check the API key."):status===403?`TinyFish refused the request${detail?`: ${detail}`:" (403)"}.`:status===402?"TinyFish credits are unavailable. Top up the wallet and retry.":status===429?"TinyFish rate limit reached. Try again shortly.":`TinyFish returned HTTP ${status}${detail?`: ${detail}`:"."}`)}
  return response;
 }
 export function safeFeedUrl(value:string){try{const u=new URL(value.trim());if(u.protocol!=="https:"&&u.protocol!=="http:")return null;if(/^(localhost|127\.|10\.|192\.168\.|169\.254\.|\[::1\])/.test(u.hostname))return null;return u.href}catch{return null}}
 export function safeCanvasUrl(value:string){const u=safeFeedUrl(value);if(!u)return null;const parsed=new URL(u);return parsed.origin}
 
 // 1) Fetch: the calendar feed is a plain .ics document, so TinyFish Fetch reads it live without any login.
-export async function readCalendarFeed(feedUrl:string,canvasUrl:string,key:string,signal?:AbortSignal){
- const r=await request("https://api.fetch.tinyfish.ai",key,{urls:[feedUrl],format:"html",ttl:0,per_url_timeout_ms:60000,purpose:"Read the student's own Canvas calendar feed to list upcoming assignment due dates."},signal,90000);
- const data=await r.json() as {results:{url:string;text:string|null}[];errors:{url:string;error:string}[]};
- if(data.errors?.length)throw new Error(`Calendar feed could not be read (${data.errors[0].error}). Check the feed URL in Canvas › Calendar › Calendar Feed.`);
- const text=data.results?.[0]?.text||"";if(!/BEGIN:VCALENDAR/.test(text))throw new Error("The feed URL did not return an iCalendar document.");
- return parseCalendar(text,canvasUrl);
+export async function readCalendarFeed(feedUrl:string,canvasUrl:string,key:string,signal?:AbortSignal,warn?:(m:string)=>void){
+ const purpose="Read the student's own Canvas calendar feed to list upcoming assignment due dates.";
+ let sample="";
+ for(const format of ["html","markdown"] as const){
+  const r=await request("https://api.fetch.tinyfish.ai",key,{urls:[feedUrl],format,ttl:0,per_url_timeout_ms:60000,purpose},signal,90000);
+  const data=await r.json() as {results:{url:string;text:string|null}[];errors:{url:string;error:string;status?:number}[]};
+  if(data.errors?.length){const e=data.errors[0];if(e.error==="target_http_error"&&(e.status===401||e.status===403))throw new Error("Canvas rejected the feed URL (HTTP "+e.status+"). Copy a fresh link from Canvas › Calendar › Calendar Feed.");sample=`${e.error}${e.status?" "+e.status:""}`;continue}
+  const text=unwrapIcs(data.results?.[0]?.text||"");if(/BEGIN:VCALENDAR/.test(text))return parseCalendar(text,canvasUrl);
+  sample=(data.results?.[0]?.text||"").replace(/\s+/g," ").slice(0,100);
+ }
+ // TinyFish Fetch could not hand back the raw iCalendar text (some servers send it as an attachment), so read the feed directly as a fallback.
+ const direct=await fetch(feedUrl,{headers:{Accept:"text/calendar, text/plain;q=0.9, */*;q=0.5"},signal:signal?AbortSignal.any([signal,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000)});
+ const body=direct.ok?await direct.text():"";
+ if(/BEGIN:VCALENDAR/.test(body)){warn?.("TinyFish Fetch returned "+(sample?`"${sample}"`:"no iCalendar text")+" for the feed, so it was read directly this time.");return parseCalendar(body,canvasUrl)}
+ throw new Error(`The feed URL did not return an iCalendar document${sample?` (got: ${sample})`:""}${!direct.ok?` and a direct read returned HTTP ${direct.status}`:""}. Copy the link from Canvas › Calendar › Calendar Feed; it should end in .ics.`);
 }
+function unwrapIcs(text:string){let t=text.replace(/^```[a-z]*\s*|```\s*$/g,"").trim();t=t.replace(/<br\s*\/?>/gi,"\n").replace(/<[^>]+>/g,"");t=t.replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;/g,"'");return t}
 
 // 2) Agent: the only endpoint that can work inside the signed-in Canvas session. The session comes from a Browser Context Profile the student set up in the TinyFish dashboard.
 const outputSchema={type:"object",properties:{
- student:{type:"string",description:"Display name shown in Canvas, or empty"},
- todo:{type:"array",items:{type:"object",properties:{title:{type:"string"},course:{type:"string"},due:{type:"string",description:"ISO 8601 if visible, else the text shown"},points:{type:"string"},status:{type:"string",enum:["due","submitted","missing","unknown"]},url:{type:"string"}},required:["title","course","due","status","url"]}},
- grades:{type:"array",items:{type:"object",properties:{course:{type:"string"},assignment:{type:"string"},score:{type:"string"},outOf:{type:"string"},feedback:{type:"string",description:"Exact instructor comment text if visible, else empty"},gradedAt:{type:"string"},url:{type:"string"}},required:["course","assignment","score","outOf","feedback","gradedAt","url"]}},
- announcements:{type:"array",items:{type:"object",properties:{course:{type:"string"},title:{type:"string"},summary:{type:"string",description:"Two sentence summary of the announcement body"},postedAt:{type:"string"},url:{type:"string"}},required:["course","title","summary","postedAt","url"]}},
+ student:{type:"string"},
+ todo:{type:"array",items:{type:"object",properties:{title:{type:"string"},course:{type:"string"},due:{type:"string"},points:{type:"string"},status:{type:"string",enum:["due","submitted","missing","unknown"]},url:{type:"string"}},required:["title","course","due","status","url"]}},
+ grades:{type:"array",items:{type:"object",properties:{course:{type:"string"},assignment:{type:"string"},score:{type:"string"},outOf:{type:"string"},feedback:{type:"string"},gradedAt:{type:"string"},url:{type:"string"}},required:["course","assignment","score","outOf","feedback","gradedAt","url"]}},
+ announcements:{type:"array",items:{type:"object",properties:{course:{type:"string"},title:{type:"string"},summary:{type:"string"},postedAt:{type:"string"},url:{type:"string"}},required:["course","title","summary","postedAt","url"]}},
  inbox:{type:"array",items:{type:"object",properties:{from:{type:"string"},subject:{type:"string"},preview:{type:"string"},receivedAt:{type:"string"}},required:["from","subject","preview","receivedAt"]}}
 },required:["student","todo","grades","announcements","inbox"]};
 export async function runCanvasAgent(s:Settings,key:string,emit:Emit,signal?:AbortSignal){
@@ -38,7 +48,7 @@ export async function runCanvasAgent(s:Settings,key:string,emit:Emit,signal?:Abo
 Starting at ${s.canvasUrl}/ (if a login screen appears, stop and report "login_required" in student).
 ${wants}
 Rules: read only. Do not submit, upload, post, reply, mark anything as read, change settings or leave the ${new URL(s.canvasUrl).hostname} domain. Do not open external links. Keep each list to the most relevant 25 items. Use absolute HTTPS URLs from the address bar. If a section is empty, return an empty array. Return exactly the JSON described by the schema.`;
- const response=await request("https://agent.tinyfish.ai/v1/automation/run-sse",key,{url:s.canvasUrl+"/",goal,output_schema:outputSchema,browser_profile:"lite",use_profile:true,...(s.profileId?{profile_id:s.profileId}:{}),use_vault:false,agent_config:{max_steps:120,max_duration_seconds:270}},signal,290000);
+ const response=await request("https://agent.tinyfish.ai/v1/automation/run-sse",key,{url:s.canvasUrl+"/",goal,output_schema:outputSchema,browser_profile:"lite",use_profile:true,...(s.profileId?{profile_id:s.profileId}:{}),use_vault:false},signal,290000);
  const reader=response.body?.getReader();if(!reader)throw new Error("Agent did not start.");const decoder=new TextDecoder();let pending="",result:unknown=null,runId="",failed="";const steps:string[]=[];
  function line(value:string){if(!value.startsWith("data:"))return;let event:{type?:string;run_id?:string;purpose?:string;status?:string;result?:unknown;resultJson?:unknown;error?:{message?:string;code?:string}|string};try{event=JSON.parse(value.slice(5).trim())}catch{return}
   if(event.run_id)runId=event.run_id;
@@ -64,7 +74,7 @@ export async function buildDigest(s:Settings,key:string,emit:Emit,signal?:AbortS
  const calls={fetch:0,agent:0,monitor:0},warnings:string[]=[],sources:string[]=[];let deadlines:Deadline[]=[];
  const feed=s.feedUrl?safeFeedUrl(s.feedUrl):null;
  const feedWork=(async()=>{if(!feed){warnings.push("No calendar feed URL set, so due dates come only from the signed-in browser run. Add the feed from Canvas › Calendar › Calendar Feed for exact times.");return}
-  emit("Reading your Canvas calendar feed live…");calls.fetch++;try{const all=await readCalendarFeed(feed,s.canvasUrl,key,signal);sources.push("calendar feed");deadlines=all.filter(d=>inWindow(d,s.days))}catch(e){if(signal?.aborted)throw e;warnings.push(errorText(e))}})();
+  emit("Reading your Canvas calendar feed live…");calls.fetch++;try{const all=await readCalendarFeed(feed,s.canvasUrl,key,signal,m=>warnings.push(m));sources.push("calendar feed");deadlines=all.filter(d=>inWindow(d,s.days))}catch(e){if(signal?.aborted)throw e;warnings.push(errorText(e))}})();
  const anyTask=Object.values(s.tasks).some(Boolean);
  let agent:Awaited<ReturnType<typeof runCanvasAgent>>|null=null;
  if(anyTask){emit("Opening Canvas in your saved browser session…");calls.agent++;try{agent=await runCanvasAgent(s,key,emit,signal);sources.push("signed-in Canvas session")}catch(e){if(signal?.aborted)throw e;warnings.push(errorText(e))}}
